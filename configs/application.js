@@ -7,13 +7,9 @@ module.exports = {
      */
     requiredFolders: [
         "logs",
-        "statics"
-    ],
+        "statics",
+        "src/core/database/models",
+        "src/modules"
+    ]
 
-    /**
-     * Express server configuration
-     */
-    expressServer: {
-        port: 8080
-    }
 }

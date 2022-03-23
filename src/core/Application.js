@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const MongoDB = require("./database/MongoDB");
 const SystemError = require("./errors/SystemError");
 const ExpressServer = require("./server/ExpressServer");
 
@@ -19,6 +20,11 @@ class Application {
      * Express user server
      */
     static #expressServer;
+
+    /**
+     * Mongodb connection
+     */
+    static #mongodbConnection;
 
     /**
      * Set the path to the root directory
@@ -71,11 +77,24 @@ class Application {
                 fs.mkdirSync(folderGlobalPath, {recursive: true});
         }
 
+        // Setup and connect mongo database
+        this.#mongodbConnection = new MongoDB(
+            {
+                host: process.env.DB_HOST,
+                port: process.env.DB_PORT,
+                name: process.env.DB_NAME,
+                user: process.env.DB_USER,
+                password: process.env.DB_PASSWORD,
+            }
+        );
+        this.#mongodbConnection.initialize();
+
         // Setup and start express server
         this.#expressServer = new ExpressServer(
             {
-                port: parseInt(process.env.PORT),
-                pathStaticsDirectory: Application.getStaticsDirectory()
+                port: parseInt(process.env.EXPRESS_PORT),
+                pathStaticsDirectory: Application.getStaticsDirectory(),
+                pathModulesDirectory: path.join(Application.getRootDirectory(), process.env.EXPRESS_MODULES_PATH),
             }
         );
         this.#expressServer.start();

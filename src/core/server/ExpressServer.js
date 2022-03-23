@@ -1,10 +1,13 @@
 const os = require("os");
+const fs = require("fs");
+const path = require("path");
 const cors = require("cors");
 const express = require("express");
 const bodyParser = require("body-parser");
 const expressFormData = require("express-form-data");
 
-const Application = require("../Application");
+const Logger = require("../../utils/Logger");
+const ApiError = require("../errors/ApiError");
 
 /**
  * Express server
@@ -12,9 +15,11 @@ const Application = require("../Application");
  */
 class ExpressServer {
     #app;
+    #logger;
     #appOptions = {
         port: 8080,
         pathStaticsDirectory: __dirname,
+        pathModulesDirectory: __dirname
     };
     
     /**
@@ -22,7 +27,10 @@ class ExpressServer {
      */
     constructor (appOptions = this.#appOptions) {
         // Set app options
-        this.#appOptions = appOptions;
+        this.#appOptions = Object.assign(this.#appOptions, appOptions);
+
+        // Setup logger
+        this.#logger = new Logger("express-server");
 
         // Create express-server
         this.#app = express();
@@ -47,7 +55,31 @@ class ExpressServer {
         
         // Setup REST API
         this.#app.use("/api/:module/:action", (req, res) => {
+            try {
+                // Set required variables
+                const {module, action} = req.params;
 
+                // Get incoming data
+                const data = req.method === "POST" ? req.body : req.query ?? {}
+
+                // Try to get needle module
+                const requestModulePath = path.join(this.#appOptions.pathModulesDirectory, `${module}.js`);
+                if (!fs.existsSync(requestModulePath))
+                    throw ApiError.notFound(`Module '${module}' not found`);
+
+                // Require request module
+                const requestModule = require(requestModulePath);
+
+                // Try to get needle action
+                if (!requestModule[action]) 
+                    throw ApiError.notFound(`Module '${module}' haven't action '${action}'`);
+
+                // Run method and save response
+                const response = requestModule[action]();
+            } catch (e) {
+                const response = e.toObject ? e.toObject() : (new ApiError(e.toString())).toObject();
+                res.status(response.data.code).json(response).end();
+            }
         });
     }
 
@@ -59,7 +91,7 @@ class ExpressServer {
         this.#app.listen(
             this.#appOptions.port,
             () => {
-                console.log(`Express server started on :${this.#appOptions.port}`);
+                this.#logger.templatePrint([`started on`, Logger.getColors().yellow(`:${this.#appOptions.port}`)]);
             }
         )
     }
